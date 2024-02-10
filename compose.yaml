@@ -1,0 +1,41 @@
+services:
+  nginx:
+    container_name: nginx
+    image: nginx:1.20-alpine
+    ports:
+      - ${NGINX_PORT}:80
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - go
+
+  go:
+    container_name: go
+    image: golang:latest
+    ports:
+      - ${GO_PORT}:8080
+    volumes:
+      - ./src/${PROJECT_NAME}:/go/src/app
+    working_dir: /go/src/app
+    tty: true
+    environment:
+      - TZ=${TZ}
+    depends_on:
+      - mysql
+  
+  mysql:
+    container_name: mysql
+    build: ./docker/mysql
+    ports:
+      - ${MYSQL_PORT}:3306
+    volumes:
+      - mysql-store:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${PROJECT_NAME}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - TZ=${TZ}
+
+volumes:
+  mysql-store:
+

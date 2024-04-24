@@ -9,15 +9,27 @@ services:
     environment:
       - NGINX_PORT=${NGINX_PORT}
     depends_on:
-      - go
+      - api
 
-  go:
-    container_name: go
+  api:
+    container_name: api
     image: golang:latest
     ports:
       - ${GO_PORT}:8080
     volumes:
       - ./src/${PROJECT_NAME}:/go/src/app
+    working_dir: /go/src/app
+    tty: true
+    environment:
+      - TZ=${TZ}
+    depends_on:
+      - mysql
+  
+  cli:
+    container_name: cli
+    image: golang:latest
+    volumes:
+      - ./src/${CLI_PROJECT_NAME}:/go/src/app
     working_dir: /go/src/app
     tty: true
     environment:
@@ -59,8 +71,46 @@ services:
     command: server /export --console-address ":9001"
     volumes:
       - minio-store:/export
+  
+  opensearch:
+    container_name: opensearch
+    build:
+      context: ./docker/opensearch
+      dockerfile: Dockerfile
+    ulimits:
+      memlock:
+        soft: ${OPENSEARCH_MEMLOCK_SOFT}
+        hard: ${OPENSEARCH_MEMLOCK_HARD}
+      nofile:
+        soft: ${OPENSEARCH_NOFILE_SOFT}
+        hard: ${OPENSEARCH_NOFILE_HARD}
+    volumes:
+      - opensearch-store:/usr/share/opensearch/data
+    ports:
+      - ${OPENSEARCH_REST_PORT}:9200
+      - ${OPENSEARCH_PERFORMANCE_PORT}:9600
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.seed_hosts=opensearch-node1
+      - cluster.initial_cluster_manager_nodes=opensearch-node1
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+
+  opensearch-dashboards:
+    container_name: opensearch-dashboards
+    image: opensearchproject/opensearch-dashboards:latest
+    ports:
+      - ${OPENSEARCH_DASHBOARDS_PORT}:5601
+    expose:
+      - ${OPENSEARCH_DASHBOARDS_PORT}
+    environment:
+      - OPENSEARCH_HOSTS=${OPENSEARCH_HOSTS}
+
 
 volumes:
   mysql-store:
   redis-store:
   minio-store:
+  opensearch-store:
